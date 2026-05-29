@@ -7,7 +7,7 @@ around vintage CAPI / 500-series hardware.
 
 | File | Description |
 | --- | --- |
-| `logo-preview.html` | Home: interactive octagon "volume knob" logo, hardware-style navbar, pilot lamp + dark/light theme toggle, and the LC25 / LC40 product modules. |
+| `index.html` | Home: interactive octagon "volume knob" logo, hardware-style navbar, pilot lamp + dark/light theme toggle, and the LC25 / LC40 product modules. |
 | `category.html` | **The Patch Bay** — the full catalog rendered as a wall of rack modules; each module pulls open to reveal its sub-categories as patch points. |
 | `login.html` | Studio-gear themed sign-in panel (wood frame, anodized card, amber power lamp). |
 
@@ -26,7 +26,7 @@ Living in `frontend/src/components/` for the eventual Vue 3 + Vite build:
 
 ```bash
 python3 -m http.server 8181
-# then open http://localhost:8181/logo-preview.html
+# then open http://localhost:8181/
 ```
 
 ## Stack (planned)

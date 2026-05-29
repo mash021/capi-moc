@@ -1,4 +1,0 @@
-{
-  "cleanUrls": true,
-  "rewrites": [{ "source": "/", "destination": "/logo-preview.html" }]
-}
