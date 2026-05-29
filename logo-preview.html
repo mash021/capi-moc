@@ -1,0 +1,1658 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>CAPI Logo — Interactive Preview</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel: #111;
+      --text: #e6e6e6;
+      --muted: #888;
+      --cyan: #007DC5;
+    }
+    /* Light theme: page surface + prose flip; the hardware panels stay
+       dark metal (real gear doesn't change colour), which reads as gear
+       sitting on a bright studio desk. */
+    html[data-theme="light"] {
+      --bg: #eef0f3;
+      --panel: #ffffff;
+      --text: #16181c;
+      --muted: #5c606a;
+      --cyan: #0067a8;
+    }
+    html { transition: background .3s ease; }
+    * { box-sizing: border-box; }
+    /* High-quality font stack: native UI fonts on every OS, fall back to Inter. */
+    html, body {
+      margin: 0; padding: 0; background: var(--bg); color: var(--text);
+      font-family:
+        -apple-system, BlinkMacSystemFont,
+        'SF Pro Display', 'SF Pro Text',
+        'Segoe UI', 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;   /* the pilot lamp bleeds off the right edge */
+    }
+
+    /* === Navbar (looks like a CAPI hardware front panel) === */
+    .navbar {
+      display: flex; align-items: center; gap: 24px;
+      padding: 8px 28px 10px;
+      background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+      border-bottom: 2px solid #000;
+      box-shadow:
+        inset 0  1px 0 rgba(255,255,255,0.04),
+        inset 0 -1px 0 rgba(0,0,0,0.7),
+        0 4px 12px rgba(0,0,0,0.6);
+      /* Allow the rotating tip of the logo to extend visually upward
+         without being clipped by the navbar's bottom-edge bevel. */
+      overflow: visible;
+      position: relative;
+    }
+    .navbar .logo-wrap { width: 176px; }
+
+    .capi-controls {
+      display: flex; align-items: center; gap: 20px;
+      margin-left: auto;
+    }
+
+    /* Each nav item = an LED + a small round metal button + a screen-printed label */
+    .capi-control {
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
+      background: none; border: 0; padding: 4px 2px 2px;
+      cursor: pointer; font: inherit;
+    }
+    /* LED stacked ABOVE the button (was beside it) */
+    .capi-control .led-and-button {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+    }
+
+    /* LED: dim amber when OFF, glowing amber when ON */
+    .capi-control .led {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #2e2105 0%, #100a00 100%);
+      box-shadow: inset 0 1px 1px rgba(0,0,0,0.85);
+      transition: all .15s ease;
+    }
+    .capi-control[aria-pressed="true"] .led {
+      background: radial-gradient(circle at 35% 30%, #fff5b0 0%, #f0c000 45%, #b07000 100%);
+      box-shadow:
+        0 0 5px rgba(255, 195, 0, .85),
+        0 0 12px rgba(255, 180, 0, .35),
+        inset 0 0 2px rgba(255, 230, 120, .9);
+    }
+
+    /*
+       Cylindrical push-button:
+       - .button itself = the dark VERTICAL SIDE of the cylinder
+       - .button::after  = the lighter CAP sitting on top, inset slightly from
+                           the bottom so a sliver of the side stays visible
+                           (that exposed band is what reads as "cylinder height").
+    */
+    .capi-control .button {
+      position: relative;
+      width: 26px; height: 30px;
+      border-radius: 50%;
+      /* dark cylinder side */
+      background: linear-gradient(180deg, #444 0%, #181818 70%, #080808 100%);
+      border: 1px solid #050505;
+      box-shadow:
+        0 3px 5px rgba(0,0,0,.65),
+        0 1px 0 rgba(255,255,255,.04) inset,
+        0 -2px 4px rgba(0,0,0,.55) inset;
+      transition: transform .07s ease, box-shadow .07s ease, filter .12s;
+    }
+    .capi-control .button::after {
+      content: '';
+      position: absolute;
+      top: 1px; left: 1px; right: 1px;
+      height: calc(100% - 5px);                   /* ~4px of side showing */
+      border-radius: 50%;
+      background:
+        radial-gradient(ellipse 60% 55% at 32% 22%,
+          #fbfbfb 0%, #dcdcdc 30%, #a4a4a4 70%, #6a6a6a 100%);
+      box-shadow:
+        inset 0  1px 1px rgba(255,255,255,.45),
+        inset 0 -1px 2px rgba(0,0,0,.20),
+        0 1px 1px rgba(0,0,0,.35);
+      transition: height .07s ease, top .07s ease, box-shadow .07s ease;
+    }
+
+    .capi-control:hover .button::after { filter: brightness(1.06); }
+    .capi-control:active .button {
+      transform: translateY(1px);
+      box-shadow:
+        0 1px 2px rgba(0,0,0,.6),
+        0 -2px 4px rgba(0,0,0,.55) inset;
+    }
+    .capi-control:active .button::after {
+      top: 2px;
+      height: calc(100% - 6px);
+      box-shadow:
+        inset 0 2px 3px rgba(0,0,0,.35),
+        0 1px 1px rgba(0,0,0,.3);
+    }
+
+    /* Red button (Login - styled like 48V phantom power) */
+    .capi-control.red .button {
+      background: linear-gradient(180deg, #5a0a0a 0%, #1a0000 70%, #0a0000 100%);
+    }
+    .capi-control.red .button::after {
+      background:
+        radial-gradient(ellipse 60% 55% at 32% 22%,
+          #ff9090 0%, #e02525 30%, #9a0a0a 70%, #5a0000 100%);
+    }
+    .capi-control[aria-pressed="true"].red .led {
+      background: radial-gradient(circle at 35% 30%, #ffcccc 0%, #ff2020 45%, #800404 100%);
+      box-shadow:
+        0 0 6px rgba(255, 30, 30, .9),
+        0 0 14px rgba(255, 20, 20, .35);
+    }
+
+    /* "Screen-printed" label below the button — small, refined, well-tracked */
+    .capi-control .label {
+      font-weight: 600;
+      font-size: 9.5px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      text-shadow: 0 1px 0 rgba(0,0,0,.55);
+      /* Pull the start of the text slightly to optically center the tracking */
+      padding-left: .16em;
+      transition: color .15s ease, text-shadow .15s ease;
+    }
+    .capi-control[aria-pressed="true"] .label {
+      color: #6fdcff;
+      text-shadow: 0 0 5px rgba(0,180,255,.55), 0 1px 0 rgba(0,0,0,.55);
+    }
+
+    /* === Hero === */
+    .hero {
+      max-width: 1180px; margin: 0 auto; padding: 48px 24px;
+      display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px;
+      align-items: center;
+    }
+    .hero h1 { font-size: 32px; margin: 0 0 12px; letter-spacing: -.5px; }
+    .hero .lede { color: var(--muted); line-height: 1.6; margin: 0 0 20px; }
+    .hero .lede b { color: var(--cyan); }
+    .hero .hint {
+      display: inline-block; padding: 8px 14px; background: var(--panel);
+      border: 1px solid #1f1f1f; border-radius: 999px; font-size: 13px;
+      color: var(--muted);
+    }
+    .hero .readout {
+      margin-top: 16px; font-family: 'SF Mono', Menlo, monospace;
+      font-size: 13px; color: var(--cyan);
+    }
+    /* Studio "rack": VU meter sitting above the knob, both right-aligned. */
+    .hero-rack {
+      display: flex; flex-direction: column; gap: 18px;
+      align-items: stretch;
+      width: 100%; max-width: 460px;
+      justify-self: end;
+    }
+
+    /* (VU meter has been moved to its own component:
+       frontend/src/components/CapiVuMeter.vue) */
+
+    /* === Amber pilot lamp (under the meter, vintage tube-amp style) ===
+       A real incandescent bulb never sits perfectly still — its filament
+       resistance changes microscopically with temperature, producing the
+       characteristic "warm flicker". We approximate it with a long,
+       multi-stop opacity/brightness keyframe so the rhythm is irregular. */
+    .capi-pilot {
+      display: block; width: 100%; height: auto;
+      user-select: none;
+      filter: drop-shadow(0 10px 22px rgba(0,0,0,.62));
+    }
+    @keyframes pilotFlicker {
+      0%, 100% { opacity: 1;    filter: brightness(1); }
+      11%      { opacity: .97;  filter: brightness(.96); }
+      12%      { opacity: 1;    filter: brightness(1.02); }
+      36%      { opacity: 1;    filter: brightness(1); }
+      37%      { opacity: .92;  filter: brightness(.9); }
+      38%      { opacity: 1;    filter: brightness(1); }
+      62%      { opacity: 1;    filter: brightness(1.03); }
+      63%      { opacity: .96;  filter: brightness(.94); }
+      64%      { opacity: 1;    filter: brightness(1); }
+      85%      { opacity: 1;    filter: brightness(1); }
+      86%      { opacity: .94;  filter: brightness(.92); }
+      87%      { opacity: 1;    filter: brightness(1); }
+    }
+    /* Halo and bulb pulse at slightly different rates so the spill of
+       light onto the panel never quite tracks the bulb itself — more
+       believable than a perfectly synced animation. */
+    @keyframes pilotHaloPulse {
+      0%, 100% { opacity: .72; transform: scale(1); }
+      50%      { opacity: .92; transform: scale(1.04); }
+    }
+    .capi-pilot .lamp-bulb   { animation: pilotFlicker 6.8s ease-in-out infinite; transform-origin: center; }
+    .capi-pilot .lamp-halo-g { animation: pilotHaloPulse 3.3s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+
+    /* Pilot wrapper hosts the lamp SVG + the panel-mounted theme toggle. */
+    .pilot-wrap { position: relative; width: 100%; }
+
+    /* Panel-mounted toggle ("kolangi") that flips the site theme.
+       Bat sits UP for DARK, flips DOWN for LIGHT. */
+    .theme-switch {
+      position: absolute; top: 50%; right: 28px; transform: translateY(-50%);
+      display: inline-flex; flex-direction: column; align-items: center; gap: 5px;
+      background: none; border: 0; padding: 0; cursor: pointer; z-index: 3;
+      perspective: 150px;
+      /* Natural cast shadow so the toggle reads as a raised part on the
+         panel — and stays visible once the page goes light. */
+      filter: drop-shadow(0 3px 4px rgba(0,0,0,0.55));
+    }
+    .theme-switch .ts-label {
+      font: 700 6px/1 Georgia, 'Times New Roman', serif;
+      letter-spacing: 0.18em; color: #7a6a40;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.55);
+      transition: color .2s, text-shadow .2s;
+    }
+    /* Chrome mounting bezel — the threaded bushing/nut the toggle is screwed
+       through on a vintage console front panel. */
+    .theme-switch .ts-rail {
+      position: relative;
+      width: 28px; height: 28px; border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 32%, #fdfdfd 0%, #d2d2d2 28%,
+          #909090 52%, #4f4f4f 78%, #1d1d1d 100%);
+      box-shadow:
+        inset 0 1px 1px rgba(255,255,255,0.75),
+        inset 0 -2px 4px rgba(0,0,0,0.6),
+        0 2px 5px rgba(0,0,0,0.7);
+      display: flex; align-items: center; justify-content: center;
+      transform-style: preserve-3d;
+    }
+    /* Recessed dark socket the bat pivots out of. */
+    .theme-switch .ts-rail::before {
+      content: ''; position: absolute;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: radial-gradient(circle at 50% 38%, #232323, #000);
+      box-shadow: inset 0 2px 3px rgba(0,0,0,0.95);
+    }
+    /* The chromed metal bat lever (pivots at its base inside the socket). */
+    .theme-switch .ts-bat {
+      position: absolute; bottom: 50%; left: 50%;
+      width: 8px; height: 20px; border-radius: 4px 4px 3px 3px;
+      transform-origin: 50% 100%;
+      transform: translateX(-50%) rotateX(-34deg);
+      background: linear-gradient(90deg,
+        #5f5f5f 0%, #e8e8e8 28%, #ffffff 46%, #c4c4c4 62%, #5a5a5a 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.85),
+        0 2px 4px rgba(0,0,0,0.55);
+      transition: transform .2s cubic-bezier(.34,1.45,.5,1);
+    }
+    /* Rounded chrome ball tip on the end of the bat. */
+    .theme-switch .ts-bat::after {
+      content: ''; position: absolute; top: -4px; left: 50%;
+      transform: translateX(-50%);
+      width: 11px; height: 11px; border-radius: 50%;
+      background: radial-gradient(circle at 38% 30%, #ffffff 0%, #d6d6d6 45%, #7a7a7a 100%);
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.9), 0 1px 2px rgba(0,0,0,0.5);
+    }
+    /* Flip the bat DOWN for the light position. Keep the angle gentle so the
+       chrome ball tip stays clearly above the socket instead of hiding in it. */
+    html[data-theme="light"] .theme-switch .ts-bat {
+      transform: translateX(-50%) rotateX(22deg) translateY(2px);
+    }
+    /* Light up whichever label is the active position. */
+    html[data-theme="dark"]  .theme-switch .ts-label:first-of-type { color: #d8b65a; }
+    html[data-theme="light"] .theme-switch .ts-label:last-of-type  { color: #b8841f; }
+
+    /* Light theme: the pilot lamp is OFF (no glow, dark glass). */
+    html[data-theme="light"] .capi-pilot .lamp-halo-g,
+    html[data-theme="light"] .capi-pilot .lamp-glow-c { opacity: 0 !important; }
+    html[data-theme="light"] .capi-pilot .lamp-bulb { opacity: 0; animation: none; }
+
+    /* Light theme: the hero CAPI wordmark sits on the bright page surface,
+       so its white text + ® must flip to near-black to stay readable.
+       (The navbar logo stays white — it lives on the dark metal panel.) */
+    html[data-theme="light"] .hero-rack .capi-logo text[fill="#FFFFFF"] {
+      fill: #16181c;
+    }
+
+    /* Light theme: lift the products backdrop to a bright studio surface. */
+    html[data-theme="light"] .products::before {
+      background-image:
+        radial-gradient(ellipse 120% 85% at 50% 0%,
+          #e8eaee 0%, #dadde2 55%, #ccd0d6 100%);
+    }
+
+    /* === Logo === */
+    .capi-logo {
+      display: block; width: 100%; height: auto; user-select: none;
+      /* Allow the rotating tip to extend outside the viewBox (its circle
+         reaches up to y = -19 at certain angles). Without this it gets
+         clipped against the top edge of the SVG. */
+      overflow: visible;
+    }
+    .capi-spinner.interactive { cursor: grab; }
+    .capi-spinner.interactive:active { cursor: grabbing; }
+    .capi-spinner { transition: transform 60ms linear; }
+    .capi-spinner.dragging { transition: none; }
+
+    /* === Compare === */
+    .compare {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+      padding: 0 24px 40px; max-width: 1100px; margin: 0 auto;
+    }
+    .card { background: var(--panel); padding: 24px; border-radius: 8px;
+      border: 1px solid #1f1f1f; }
+    .card h3 { margin: 0 0 14px; font-size: 13px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em; }
+    .original { display: block; width: 100%; max-width: 360px; }
+
+    /* =====================================================================
+       PRODUCTS SECTION — CAPI 500-series modules
+       Each product is a tall vertical module rendered as plain HTML/SVG and
+       tilted in 3D via CSS perspective. Knobs reuse the logo's spinner art.
+       ===================================================================== */
+    .products {
+      position: relative;
+      max-width: 1200px;
+      margin: 80px auto 60px;
+      padding: 64px 24px 72px;
+    }
+    /*
+      Full-bleed backdrop behind the modules: black anodized aluminium.
+      Layered = fine monochrome noise grain (SVG feTurbulence data-URI)
+      blended over a faint vertical brushed line pattern over a deep,
+      slightly-domed dark gradient. Darker than the page, with texture.
+    */
+    .products::before {
+      content: '';
+      position: absolute;
+      z-index: -1;
+      top: 0; bottom: 0;
+      left: 50%; transform: translateX(-50%);
+      width: 100vw;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E"),
+        repeating-linear-gradient(90deg,
+          rgba(255,255,255,0.016) 0px, rgba(255,255,255,0.016) 1px,
+          transparent 1px, transparent 4px),
+        radial-gradient(ellipse 120% 85% at 50% 0%,
+          #141414 0%, #0a0a0a 45%, #040404 100%);
+      background-size: 180px 180px, auto, auto;
+      background-blend-mode: overlay, normal, normal;
+      box-shadow:
+        inset 0  1px 0 rgba(255,255,255,0.05),
+        inset 0 -1px 0 rgba(0,0,0,0.8);
+    }
+    .products-eyebrow {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.32em; text-transform: uppercase;
+      color: var(--cyan);
+      margin: 0 0 6px;
+    }
+    .products-title {
+      font-size: 30px; letter-spacing: -0.5px;
+      margin: 0 0 8px; color: var(--text);
+    }
+    .products-lede {
+      color: var(--muted);
+      max-width: 60ch; line-height: 1.6;
+      margin: 0 0 28px;
+    }
+
+    /* Segmented model switch (LC25 / LC40) — click to swap the shown unit. */
+    .product-switch {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      margin: 0 0 48px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #161616 0%, #0b0b0b 100%);
+      border: 1px solid #232323;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        0 2px 6px rgba(0,0,0,0.5);
+    }
+    .product-tab {
+      appearance: none; border: 0; cursor: pointer;
+      padding: 9px 26px; border-radius: 7px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 800; font-size: 14px; letter-spacing: 0.04em;
+      color: #9a9a9a; background: transparent;
+      transition: color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+    .product-tab:hover { color: #d8d8d8; }
+    .product-tab[aria-selected="true"] {
+      color: #fff;
+      background: linear-gradient(180deg, #0a90db 0%, #007DC5 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.25),
+        0 1px 4px rgba(0,125,197,0.5);
+    }
+
+    /* Only the active product is shown; the other is fully removed from flow. */
+    .product[hidden] { display: none; }
+
+    .product {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 80px;
+      align-items: center;
+      margin-bottom: 110px;
+    }
+    /* The mirror layout: text first, module second */
+    .product--mirror { grid-template-columns: 1fr 420px; }
+    .product--mirror .product-stage { order: 2; }
+    .product--mirror .product-info  { order: 1; text-align: right; }
+
+    /* Flat, front-on stage (no perspective / tilt anymore). */
+    .product-stage {
+      display: flex; justify-content: center;
+    }
+
+    /* === The 500-series module ===
+       Real 500-series modules are 1.5" wide × 5.25" tall (≈ 1 : 3.5).
+       Black anodized aluminium, shown flat-on (no 3D tilt). */
+    .capi-module {
+      width: 380px;
+      height: 1180px;
+      flex-shrink: 0;
+      position: relative;
+      display: flex; flex-direction: column;
+      padding: 32px 18px 22px;
+      border-radius: 4px;
+      background-image:
+        /* fine grain noise → real brushed-metal "tooth" */
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.5'/%3E%3C/svg%3E"),
+        /* directional brushed lines, vertical */
+        repeating-linear-gradient(180deg,
+          rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px,
+          rgba(0,0,0,0.05) 1px, rgba(0,0,0,0.05) 2px,
+          transparent 2px, transparent 4px),
+        /* anodized light sheen down the panel */
+        linear-gradient(180deg, #232323 0%, #121212 6%, #0d0d0d 94%, #232323 100%);
+      background-size: 160px 160px, auto, auto;
+      background-blend-mode: overlay, normal, normal;
+      box-shadow:
+        /* soft, symmetric drop shadow (flat panel) */
+        0 24px 50px rgba(0,0,0,0.6),
+        0 8px 18px rgba(0,0,0,0.5),
+        /* edge bevels */
+        inset 0  1px 0 rgba(255,255,255,0.06),
+        inset 0 -1px 0 rgba(0,0,0,0.7),
+        inset  1px 0 0 rgba(255,255,255,0.04),
+        inset -1px 0 0 rgba(0,0,0,0.55);
+    }
+
+    /* Mounting screws: just TWO — one centred at top, one centred at
+       bottom — matching the real LC25 rack-ear fixing.
+       Old, rusted slotted screws sunk into a larger countersunk seat. */
+    .module-screw {
+      position: absolute;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      /* Mottled rust: layered off-centre radials give blotchy oxidation
+         over a corroded brown-orange base. */
+      background:
+        radial-gradient(circle at 68% 72%, rgba(40,20,8,0.85) 0%, transparent 32%),
+        radial-gradient(circle at 30% 64%, rgba(150,70,28,0.6) 0%, transparent 38%),
+        radial-gradient(circle at 60% 30%, rgba(190,120,60,0.55) 0%, transparent 40%),
+        radial-gradient(circle at 38% 34%,
+          #b9824a 0%, #8a5128 32%, #5c3417 64%, #2c1908 100%);
+      /* The bigger "seat": a dark countersunk recess ring + faint highlight
+         lip, so the screw reads as sunk into a larger drilled hole. */
+      box-shadow:
+        inset 0 -2px 4px rgba(0,0,0,0.7),
+        inset 0  2px 2px rgba(255,220,170,0.18),
+        0 0 0 3px #0c0c0c,
+        0 0 0 5px rgba(255,255,255,0.05),
+        0 2px 5px rgba(0,0,0,0.7);
+    }
+    /* Square (Robertson) drive recess — a small sunken square in the
+       centre, driven in at a slight angle so it looks hand-fitted. */
+    .module-screw::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 42%; height: 42%;
+      transform: translate(-50%, -50%) rotate(-18deg);
+      border-radius: 2px;
+      background:
+        radial-gradient(circle at 38% 34%,
+          #3a2110 0%, #1c0f06 55%, #0a0502 100%);
+      box-shadow:
+        inset 0 2px 3px rgba(0,0,0,0.85),
+        inset 0 -1px 1px rgba(210,160,110,0.22),
+        0 1px 0 rgba(210,160,110,0.2);
+    }
+    .module-screw--t { top: 9px;    left: 50%; transform: translateX(-50%); }
+    .module-screw--b { bottom: 9px; left: 50%; transform: translateX(-50%); }
+
+    /* === Module header: CAPI corner-stamp + PK LED === */
+    .module-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 6px; margin-bottom: 18px;
+      position: relative;
+    }
+    /* Stylised "CAPI" wordmark in a small black box with a cyan-corner notch.
+       Matched to the website header logo: bold-900 white with tight,
+       slightly negative letter-spacing for that compact industrial look. */
+    .module-capi {
+      position: relative;
+      display: inline-block;
+      padding: 5px 24px 5px 10px;
+      border: 1px solid #2a2a2a;
+      border-radius: 2px;
+      background: #050505;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+      font-weight: 900;
+      font-size: 19px;
+      letter-spacing: -0.03em;
+      color: #fff;
+    }
+    .module-capi::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 15px; height: 15px;
+      background:
+        linear-gradient(135deg, transparent 50%, var(--cyan) 50%);
+      border-radius: 0 2px 0 0;
+    }
+
+    .module-pk {
+      display: flex; align-items: center; gap: 5px;
+      font-family: -apple-system, sans-serif;
+      font-size: 8px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: #d0d0d0;
+    }
+    .module-pk-led {
+      width: 6px; height: 6px; border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 30%, #ff8080 0%, #e02020 50%, #6a0404 100%);
+      box-shadow:
+        0 0 5px rgba(255, 30, 30, 0.85),
+        0 0 12px rgba(255, 20, 20, 0.35);
+    }
+
+    /* === Knob grid (5 rows × 2 columns) === */
+    .module-body {
+      flex: 1;
+      display: flex; flex-direction: column;
+      justify-content: space-around;
+      padding: 6px 0;
+    }
+    .module-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+    }
+    /*
+      Each knob lives inside a circular "panel-recess" plate so the
+      surrounding shape (the part of the module the knob is mounted
+      into) reads clearly — not just the rotating spinner art alone.
+      Sized so the spinner's silver/cyan octagon visibly extends
+      almost to the recess edge, like a real EQ pot in a hand-cut hole.
+    */
+    .module-knob {
+      width: 170px; height: 170px;
+      justify-self: center;
+      position: relative;
+      border-radius: 50%;
+      /* Subtle dark recess + soft inner highlight ring */
+      background:
+        radial-gradient(circle at 50% 30%,
+          #1f1f1f 0%, #0e0e0e 60%, #050505 100%);
+      box-shadow:
+        inset 0  2px 4px rgba(0,0,0,0.7),
+        inset 0 -1px 1px rgba(255,255,255,0.06),
+        0 1px 0 rgba(255,255,255,0.04);
+      display: flex; align-items: center; justify-content: center;
+      padding: 4px;
+    }
+    /* Make sure the spinner SVG itself fills the recess */
+    .module-knob > svg { width: 100%; height: 100%; }
+
+    /*
+      3D + auto-spin. The spinner art (the <g class="kn-spinner"> group)
+      gets a continuous slow rotation driven entirely by CSS so every
+      knob idles like a powered-up VU rig. transform-box/origin keep the
+      pivot locked to the SVG group's own centre regardless of viewBox.
+      The drop-shadow + slight scale gives it a raised, dimensional pot
+      feel sitting proud of the panel recess.
+    */
+    .module-knob > svg { filter: drop-shadow(0 4px 5px rgba(0,0,0,0.6)); }
+    /* The pointer sweeps back-and-forth ONLY within the dial scale —
+       from the −15 stop (−135°) to the +15 stop (+135°) — never past
+       the printed numbers, exactly like a real pot with end stops. */
+    .module-knob .kn-spinner {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: knobSweep 9s ease-in-out infinite alternate;
+    }
+    /* Stagger so the rack doesn't sweep in lockstep */
+    .module-knob:nth-child(4n+1) .kn-spinner { animation-duration: 8s; }
+    .module-knob:nth-child(4n+2) .kn-spinner { animation-duration: 11s;  animation-direction: alternate-reverse; }
+    .module-knob:nth-child(4n+3) .kn-spinner { animation-duration: 9.5s; }
+    .module-knob:nth-child(4n)   .kn-spinner { animation-duration: 12s;  animation-direction: alternate-reverse; }
+    @keyframes knobSweep {
+      from { transform: rotate(-100deg); }
+      to   { transform: rotate(100deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .module-knob .kn-spinner { animation: none; }
+    }
+
+    /* === Module footer: BYP/ACT switch + cyan nameplate === */
+    .module-footer {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; padding: 6px 0;
+      /* Lift the switch + nameplate up off the very bottom edge. */
+      margin-bottom: 40px;
+    }
+    .module-toggles {
+      display: flex; align-items: center; gap: 9px;
+      font-family: -apple-system, sans-serif;
+      font-size: 8.5px; font-weight: 700;
+      letter-spacing: 0.18em; color: #d0d0d0;
+    }
+    /* Clickable rocker switch: a metal cap that slides UP (=ACT) or
+       DOWN (=BYP). Wired up in JS to drive the two indicator LEDs. */
+    .module-toggle {
+      width: 18px; height: 30px; border-radius: 4px;
+      position: relative; padding: 0; cursor: pointer;
+      background: linear-gradient(180deg, #3a3a3a 0%, #141414 55%, #232323 100%);
+      border: 1px solid #050505;
+      box-shadow:
+        inset 0  1px 0 rgba(255,255,255,0.10),
+        inset 0 -2px 0 rgba(0,0,0,0.5);
+    }
+    .module-toggle::after {
+      content: '';
+      position: absolute; left: 2px; right: 2px; top: 2px;
+      height: 12px; border-radius: 3px;
+      background: linear-gradient(180deg, #f0f0f0 0%, #b4b4b4 60%, #8a8a8a 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.5),
+        0 1px 2px rgba(0,0,0,0.55);
+      transition: top .14s ease, bottom .14s ease;
+    }
+    /* Cap position reflects state */
+    .capi-module[data-state="act"] .module-toggle::after { top: 2px;  bottom: auto; }
+    .capi-module[data-state="byp"] .module-toggle::after { top: auto; bottom: 2px;  }
+
+    /* Indicator LEDs: dark by default, only the ACTIVE one glows. */
+    .module-mini-led {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #2a2a2a 0%, #0c0c0c 100%);
+      box-shadow: inset 0 1px 1px rgba(0,0,0,0.7);
+      transition: background .14s ease, box-shadow .14s ease;
+    }
+    .capi-module[data-state="byp"] .module-mini-led--red {
+      background:
+        radial-gradient(circle at 35% 30%, #ff7070 0%, #d02020 50%, #500404 100%);
+      box-shadow: 0 0 5px rgba(255, 30, 30, 0.85), 0 0 11px rgba(255,20,20,0.35);
+    }
+    .capi-module[data-state="act"] .module-mini-led--green {
+      background:
+        radial-gradient(circle at 35% 30%, #b8ffb8 0%, #20c020 50%, #052005 100%);
+      box-shadow: 0 0 5px rgba(80, 220, 80, 0.8), 0 0 11px rgba(60,210,60,0.32);
+    }
+    /* Knobs sweep only when the module is ACTIVE; bypass freezes them. */
+    .capi-module[data-state="byp"] .kn-spinner { animation-play-state: paused; }
+    .module-nameplate {
+      background: var(--cyan);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 800; font-size: 13px;
+      letter-spacing: 0.06em;
+      padding: 5px 22px;
+      border-radius: 1px;
+      box-shadow:
+        inset 0  1px 0 rgba(255,255,255,0.20),
+        inset 0 -1px 0 rgba(0,0,0,0.25),
+        0 1px 0 rgba(0,0,0,0.5);
+      margin-top: 2px;
+    }
+
+    /* === Product info column === */
+    .product-info {
+      max-width: 460px;
+    }
+    .product-info .meta {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.32em; text-transform: uppercase;
+      color: var(--cyan);
+      margin: 0 0 6px;
+    }
+    .product-info h3 {
+      font-size: 42px; letter-spacing: -1px;
+      margin: 0 0 10px;
+      color: var(--text);
+    }
+    .product-info .tagline {
+      color: var(--text);
+      font-size: 16px; line-height: 1.4;
+      margin: 0 0 18px;
+      opacity: 0.85;
+    }
+    .product-info .desc {
+      color: var(--muted);
+      line-height: 1.65;
+      margin: 0 0 22px;
+    }
+    .product-info .specs {
+      list-style: none; padding: 0; margin: 0 0 28px;
+      border-top: 1px solid #1f1f1f;
+    }
+    .product-info .specs li {
+      padding: 10px 0;
+      border-bottom: 1px solid #1f1f1f;
+      color: var(--text);
+      font-size: 13px;
+      display: flex; gap: 12px;
+    }
+    .product-info .specs li::before {
+      content: '◆';
+      color: var(--cyan);
+      font-size: 9px;
+      flex-shrink: 0;
+      align-self: center;
+    }
+    .product-info .cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--cyan);
+      color: #fff;
+      font-weight: 700; font-size: 13px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 12px 24px;
+      border: 0; border-radius: 2px;
+      text-decoration: none;
+      box-shadow:
+        inset 0  1px 0 rgba(255,255,255,0.20),
+        inset 0 -1px 0 rgba(0,0,0,0.25),
+        0 4px 12px rgba(0, 125, 197, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .product-info .cta:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        inset 0  1px 0 rgba(255,255,255,0.20),
+        inset 0 -1px 0 rgba(0,0,0,0.25),
+        0 6px 16px rgba(0, 125, 197, 0.5);
+    }
+    .product--mirror .product-info .specs li {
+      flex-direction: row-reverse;
+    }
+    .product--mirror .product-info .cta {
+      flex-direction: row-reverse;
+    }
+
+    /* The knob SVG: scoped just like the main logo's spinner */
+    .capi-knob-svg {
+      display: block;
+      width: 100%; height: 100%;
+      overflow: visible;          /* let the rotating tip extend outside */
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar styled like a real CAPI hardware front panel -->
+  <header class="navbar">
+    <div class="logo-wrap">
+      <div data-capi-logo data-interactive="true" style="width: 100%"></div>
+    </div>
+    <nav class="capi-controls" aria-label="Main navigation">
+      <button type="button" class="capi-control" aria-pressed="false" data-route="/products">
+        <span class="led-and-button">
+          <span class="led" aria-hidden="true"></span>
+          <span class="button" aria-hidden="true"></span>
+        </span>
+        <span class="label">Products</span>
+      </button>
+      <button type="button" class="capi-control" aria-pressed="false" data-route="/category">
+        <span class="led-and-button">
+          <span class="led" aria-hidden="true"></span>
+          <span class="button" aria-hidden="true"></span>
+        </span>
+        <span class="label">Category</span>
+      </button>
+      <button type="button" class="capi-control" aria-pressed="false" data-route="/support">
+        <span class="led-and-button">
+          <span class="led" aria-hidden="true"></span>
+          <span class="button" aria-hidden="true"></span>
+        </span>
+        <span class="label">Support</span>
+      </button>
+      <button type="button" class="capi-control red" aria-pressed="false" data-route="/login">
+        <span class="led-and-button">
+          <span class="led" aria-hidden="true"></span>
+          <span class="button" aria-hidden="true"></span>
+        </span>
+        <span class="label">Login</span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- Hero: large interactive knob -->
+  <section class="hero">
+    <div>
+      <h1>Drag the knob.<br/>Or scroll over it.</h1>
+      <p class="lede">
+        The logo behaves like a <b>real volume knob</b>: it never spins on its own,
+        and it has <b>mechanical stops</b>. You can rotate it counter-clockwise to
+        &minus;179&deg; and clockwise to +88&deg; &mdash; a 267&deg; sweep, just like
+        a classic studio gain knob.
+      </p>
+      <span class="hint">Press + drag, or use scroll wheel &middot; range: &minus;179&deg; &hellip; +88&deg;</span>
+      <div class="readout" id="readout">Rotation: 0&deg;</div>
+    </div>
+    <div class="hero-rack">
+      <!-- (The VU meter lives in CapiVuMeter.vue now — kept out of this preview.) -->
+      <!-- Amber pilot lamp panel + a panel-mounted toggle that switches
+           the whole site between dark and light themes. -->
+      <div class="pilot-wrap">
+        <div data-capi-pilot></div>
+        <button type="button" class="theme-switch" id="theme-switch"
+                aria-label="Toggle dark / light theme">
+          <span class="ts-label">DARK</span>
+          <span class="ts-rail"><span class="ts-bat"></span></span>
+          <span class="ts-label">LIGHT</span>
+        </button>
+      </div>
+      <!-- The HERO interactive logo (knob) -->
+      <div data-capi-logo data-interactive="true" data-readout="readout" style="width: 100%"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- Products: two CAPI 500-series modules, mirrored 3D presentation -->
+  <!-- ============================================================== -->
+  <section class="products" id="products">
+    <p class="products-eyebrow">Hardware</p>
+    <h2 class="products-title">500-series modules</h2>
+    <p class="products-lede">
+      Inductor-based graphic equalizers, hand-built in the USA. Each band uses
+      a real wound coil for the musical, slightly &ldquo;analog&rdquo; tone of
+      vintage broadcast EQs &mdash; the kind of sound you can&rsquo;t fake with a plug-in.
+    </p>
+
+    <!-- Model switch: click to swap between the LC25 and LC40 units. -->
+    <div class="product-switch" role="tablist" aria-label="Choose model">
+      <button type="button" class="product-tab" role="tab"
+              data-target="lc25" aria-selected="true">LC25</button>
+      <button type="button" class="product-tab" role="tab"
+              data-target="lc40" aria-selected="false">LC40</button>
+    </div>
+
+    <!-- ============ Product 1: LC25 (module on the left) ============ -->
+    <article class="product" data-product="lc25">
+      <div class="product-stage">
+        <div class="capi-module" data-module="lc25" data-state="act">
+          <span class="module-screw module-screw--t"></span>
+
+          <header class="module-header">
+            <span class="module-capi">CAPI</span>
+            <span class="module-pk">
+              <span class="module-pk-led" aria-hidden="true"></span>PK
+            </span>
+          </header>
+
+          <div class="module-body">
+            <!-- Each row labels ONE of its two knobs; the arrow on the
+                 label points back at the knob it belongs to, alternating
+                 left/right down the rack just like a real LC25 front panel. -->
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+          </div>
+
+          <footer class="module-footer">
+            <div class="module-toggles">
+              <span class="module-mini-led module-mini-led--red" aria-hidden="true"></span>
+              BYP
+              <button type="button" class="module-toggle" aria-label="Bypass / Active"></button>
+              ACT
+              <span class="module-mini-led module-mini-led--green" aria-hidden="true"></span>
+            </div>
+            <div class="module-nameplate">LC25</div>
+          </footer>
+
+          <span class="module-screw module-screw--b"></span>
+        </div>
+      </div>
+
+      <div class="product-info">
+        <p class="meta">LC SERIES · 500</p>
+        <h3>LC25</h3>
+        <p class="tagline">
+          10-band inductor graphic EQ &middot; 25 Hz &ndash; 12.8 kHz
+        </p>
+        <p class="desc">
+          The LC25 sits at the bottom end of the LC family, covering the bass and
+          lower-mid frequencies that define the body of a mix. Hand-wound inductors
+          give every band a smooth, slightly resonant character &mdash; the same
+          flavour found in the broadcast EQs of the 1970s.
+        </p>
+        <ul class="specs">
+          <li>10 fixed-frequency bands, 25Hz to 12.8kHz</li>
+          <li>&plusmn;15 dB cut/boost per band</li>
+          <li>Hand-wound inductor circuits, made in U.S.A.</li>
+          <li>True hardwire bypass via front-panel toggle</li>
+        </ul>
+        <a class="cta" href="#">Configure &rarr;</a>
+      </div>
+    </article>
+
+    <!-- ============ Product 2: LC40 (mirrored — module on the right) ============ -->
+    <article class="product product--mirror" data-product="lc40" hidden>
+      <div class="product-stage">
+        <div class="capi-module" data-module="lc40" data-state="act">
+          <span class="module-screw module-screw--t"></span>
+
+          <header class="module-header">
+            <span class="module-capi">CAPI</span>
+            <span class="module-pk">
+              <span class="module-pk-led" aria-hidden="true"></span>PK
+            </span>
+          </header>
+
+          <div class="module-body">
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+            <div class="module-row">
+              <div class="module-knob" data-capi-knob></div>
+              <div class="module-knob" data-capi-knob></div>
+            </div>
+          </div>
+
+          <footer class="module-footer">
+            <div class="module-toggles">
+              <span class="module-mini-led module-mini-led--red" aria-hidden="true"></span>
+              BYP
+              <button type="button" class="module-toggle" aria-label="Bypass / Active"></button>
+              ACT
+              <span class="module-mini-led module-mini-led--green" aria-hidden="true"></span>
+            </div>
+            <div class="module-nameplate">LC40</div>
+          </footer>
+
+          <span class="module-screw module-screw--b"></span>
+        </div>
+      </div>
+
+      <div class="product-info">
+        <p class="meta">LC SERIES · 500</p>
+        <h3>LC40</h3>
+        <p class="tagline">
+          10-band inductor graphic EQ &middot; 40 Hz &ndash; 20 kHz
+        </p>
+        <p class="desc">
+          Where the LC25 sculpts the low end, the LC40 takes care of presence,
+          air, and the upper midrange. Same hand-built inductor topology, same
+          musical phase response &mdash; tuned for vocals, cymbals, and the top of
+          a stereo bus.
+        </p>
+        <ul class="specs">
+          <li>10 fixed-frequency bands, 40Hz to 20kHz</li>
+          <li>&plusmn;15 dB cut/boost per band</li>
+          <li>Hand-wound inductor circuits, made in U.S.A.</li>
+          <li>True hardwire bypass via front-panel toggle</li>
+        </ul>
+        <a class="cta" href="#">Configure &rarr;</a>
+      </div>
+    </article>
+  </section>
+
+  <!-- Compare with original -->
+  <section class="compare">
+    <div class="card">
+      <h3>Original (reference)</h3>
+      <img class="original" src="capi-header-left.gif" alt="Original CAPI logo" />
+    </div>
+    <div class="card">
+      <h3>Static (resting)</h3>
+      <div data-capi-logo style="width: 100%; max-width: 360px"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================== -->
+  <!-- The SVG template, rendered into every [data-capi-logo] container -->
+  <!-- ============================================================== -->
+  <template id="capi-logo-template">
+    <svg class="capi-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 130"
+         role="img" aria-label="CAPI - capi-gear.com">
+      <!-- Transparent background; the host element provides the surface color. -->
+
+      <text x="18" y="78"
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="900" font-size="64" letter-spacing="-1" fill="#FFFFFF">CAPI</text>
+      <text x="14" y="118"
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="700" font-size="18" fill="#007DC5">capi-gear.com</text>
+      <text x="306" y="122" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="600" font-size="14" fill="#FFFFFF">&#174;</text>
+
+      <defs>
+        <linearGradient class="plate-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stop-color="#E6E6E6" />
+          <stop offset="50%"  stop-color="#B8B8B8" />
+          <stop offset="100%" stop-color="#5E5E5E" />
+        </linearGradient>
+        <radialGradient class="knob-grad" cx="40%" cy="35%" r="75%">
+          <stop offset="0%"   stop-color="#3FB5F0" />
+          <stop offset="55%"  stop-color="#007DC5" />
+          <stop offset="100%" stop-color="#004A7A" />
+        </radialGradient>
+        <radialGradient class="screw-grad" cx="35%" cy="30%" r="80%">
+          <stop offset="0%"   stop-color="#8a8a8a" />
+          <stop offset="60%"  stop-color="#4a4a4a" />
+          <stop offset="100%" stop-color="#1a1a1a" />
+        </radialGradient>
+      </defs>
+
+      <g class="capi-spinner" transform="rotate(0 230 55)">
+        <!-- Top-right tip is CUT (small chamfer); other corners stay concave -->
+        <path
+          d="M 208,5 L 282,3 L 283,4
+             L 280,77 Q 259,84 252,105
+             L 208,105 Q 201,84 180,77
+             L 180,33 Q 201,26 208,5 Z"
+          fill="url(#capi-plate)" stroke="#1a1a1a" stroke-width="1.4" />
+
+        <path
+          d="M 211,8 L 278,6 L 279,7
+             L 277,75 Q 257,82 250,102
+             L 210,102 Q 203,82 183,75
+             L 183,35 Q 204,28 211,8 Z"
+          fill="none" stroke="#7a7a7a" stroke-width="0.6" opacity="0.7" />
+
+        <g>
+          <circle cx="275" cy="13" r="3.4" fill="#2a2a2a" stroke="#0a0a0a" stroke-width="0.8" />
+          <circle cx="275" cy="13" r="2.1" fill="url(#capi-screw)" />
+          <line x1="272.5" y1="13" x2="277.5" y2="13" stroke="#000" stroke-width="0.9" stroke-linecap="round" />
+        </g>
+
+        <circle cx="230" cy="55" r="40" fill="#0a3640" />
+        <circle cx="230" cy="55" r="38" fill="url(#capi-knob)" />
+        <ellipse cx="218" cy="42" rx="14" ry="9" fill="#ffffff" fill-opacity="0.22" />
+        <circle cx="230" cy="24" r="2.4" fill="#ffffff" fill-opacity="0.95" />
+      </g>
+    </svg>
+  </template>
+
+  <!-- ============================================================= -->
+  <!--  Knob-only variant of the logo: just the rotating spinner art,  -->
+  <!--  no CAPI/capi-gear.com wordmarks. Re-used as the volume knobs   -->
+  <!--  on every 500-series product module.                            -->
+  <!-- ============================================================= -->
+  <template id="capi-knob-template">
+    <svg class="capi-knob-svg" xmlns="http://www.w3.org/2000/svg"
+         viewBox="145 -45 170 195" role="img" aria-hidden="true">
+      <defs>
+        <linearGradient class="kn-plate" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stop-color="#E6E6E6" />
+          <stop offset="50%"  stop-color="#B8B8B8" />
+          <stop offset="100%" stop-color="#5E5E5E" />
+        </linearGradient>
+        <radialGradient class="kn-knob" cx="40%" cy="35%" r="75%">
+          <stop offset="0%"   stop-color="#3FB5F0" />
+          <stop offset="55%"  stop-color="#007DC5" />
+          <stop offset="100%" stop-color="#004A7A" />
+        </radialGradient>
+        <radialGradient class="kn-screw" cx="35%" cy="30%" r="80%">
+          <stop offset="0%"   stop-color="#8a8a8a" />
+          <stop offset="60%"  stop-color="#4a4a4a" />
+          <stop offset="100%" stop-color="#1a1a1a" />
+        </radialGradient>
+      </defs>
+
+      <!--
+        STATIC dial scale (hollow ring + dB tick marks + numbers), drawn
+        on the panel around the knob exactly like the real LC25/LC40.
+        Ticks + numbers are generated in JS (see the knob clone loop) and
+        inserted here so they never spin with the knob. Centre = (230,55).
+      -->
+      <g class="kn-scale"></g>
+
+      <!--
+        The knob itself is scaled down to ~0.6 around the dial centre so
+        its spinning octagon stays comfortably INSIDE the static scale
+        ring (the octagon corners would otherwise sweep over the numbers).
+      -->
+      <g class="kn-knob-wrap" transform="translate(230 55) scale(0.9) translate(-230 -55)">
+        <g class="kn-spinner" transform="rotate(0 230 55)">
+          <!-- Octagonal plate with sharp tip on top-right (matches main logo) -->
+          <path
+            d="M 208,5 L 282,3 L 283,4
+               L 280,77 Q 259,84 252,105
+               L 208,105 Q 201,84 180,77
+               L 180,33 Q 201,26 208,5 Z"
+            fill="url(#kn-plate)" stroke="#1a1a1a" stroke-width="1.4" />
+          <path
+            d="M 211,8 L 278,6 L 279,7
+               L 277,75 Q 257,82 250,102
+               L 210,102 Q 203,82 183,75
+               L 183,35 Q 204,28 211,8 Z"
+            fill="none" stroke="#7a7a7a" stroke-width="0.6" opacity="0.7" />
+          <g>
+            <circle cx="275" cy="13" r="3.4" fill="#2a2a2a" stroke="#0a0a0a" stroke-width="0.8" />
+            <circle cx="275" cy="13" r="2.1" fill="url(#kn-screw)" />
+            <line x1="272.5" y1="13" x2="277.5" y2="13" stroke="#000" stroke-width="0.9" stroke-linecap="round" />
+          </g>
+          <circle cx="230" cy="55" r="40" fill="#0a3640" />
+          <circle cx="230" cy="55" r="38" fill="url(#kn-knob)" />
+          <ellipse cx="218" cy="42" rx="14" ry="9" fill="#ffffff" fill-opacity="0.22" />
+          <circle cx="230" cy="24" r="2.4" fill="#ffffff" fill-opacity="0.95" />
+        </g>
+      </g>
+    </svg>
+  </template>
+
+  <!-- (VU meter template extracted to frontend/src/components/CapiVuMeter.vue) -->
+
+  <!-- ====================================================== -->
+  <!--  Pilot lamp panel: amber tungsten jewel, vintage rack   -->
+  <!-- ====================================================== -->
+  <template id="capi-pilot-template">
+    <svg class="capi-pilot" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 64"
+         role="img" aria-label="Power pilot lamp">
+      <defs>
+        <linearGradient class="pilot-panel" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%"   stop-color="#252525" />
+          <stop offset="50%"  stop-color="#0c0c0c" />
+          <stop offset="100%" stop-color="#1a1a1a" />
+        </linearGradient>
+        <linearGradient class="pilot-rim" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%"   stop-color="#4a4a4a" />
+          <stop offset="50%"  stop-color="#0a0a0a" />
+          <stop offset="100%" stop-color="#2a2a2a" />
+        </linearGradient>
+        <!-- Outer halo: warm spill of light onto the panel around the bulb -->
+        <radialGradient class="lamp-halo" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="#ffd070" stop-opacity="0.85" />
+          <stop offset="55%"  stop-color="#ff9020" stop-opacity="0.30" />
+          <stop offset="100%" stop-color="#ff7000" stop-opacity="0" />
+        </radialGradient>
+        <!-- Inner glow: bright fuzzy core right at the lamp glass -->
+        <radialGradient class="lamp-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="#fff5cc" stop-opacity="1" />
+          <stop offset="50%"  stop-color="#ffc060" stop-opacity="0.85" />
+          <stop offset="100%" stop-color="#e07020" stop-opacity="0" />
+        </radialGradient>
+        <!-- Bulb glass: incandescent dome with white-hot filament hotspot -->
+        <radialGradient class="lamp-bulb-grad" cx="35%" cy="30%" r="80%">
+          <stop offset="0%"   stop-color="#fffce0" />
+          <stop offset="30%"  stop-color="#fff0a0" />
+          <stop offset="65%"  stop-color="#ffa030" />
+          <stop offset="100%" stop-color="#a04000" />
+        </radialGradient>
+        <!-- Chromed bezel ring around the lamp -->
+        <radialGradient class="lamp-ring" cx="35%" cy="30%" r="80%">
+          <stop offset="0%"   stop-color="#9a9a9a" />
+          <stop offset="60%"  stop-color="#3a3a3a" />
+          <stop offset="100%" stop-color="#0a0a0a" />
+        </radialGradient>
+        <radialGradient class="pilot-screw" cx="35%" cy="30%" r="80%">
+          <stop offset="0%"   stop-color="#9a9a9a" />
+          <stop offset="55%"  stop-color="#4a4a4a" />
+          <stop offset="100%" stop-color="#1a1a1a" />
+        </radialGradient>
+      </defs>
+
+      <!-- Outer housing (rack-style 1U panel) -->
+      <rect x="0" y="0" width="460" height="64" rx="5" fill="#000" />
+      <rect x="3" y="3" width="454" height="58" rx="4" fill="url(#pilot-rim)" />
+      <rect x="9" y="9" width="442" height="46" rx="2" fill="url(#pilot-panel)" />
+
+      <!-- Subtle top-edge highlight (catches the room light) -->
+      <line x1="14" y1="11" x2="446" y2="11" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
+      <line x1="14" y1="53" x2="446" y2="53" stroke="rgba(0,0,0,0.6)" stroke-width="1" />
+
+      <!-- Halo light spilling onto the dark panel around the bulb.
+           This is the part that pulses on its own animation channel. -->
+      <g class="lamp-halo-g">
+        <ellipse cx="70" cy="32" rx="60" ry="28" fill="url(#lamp-halo)" />
+      </g>
+
+      <!-- Inner soft glow right at the lamp -->
+      <circle class="lamp-glow-c" cx="70" cy="32" r="20" fill="url(#lamp-glow)" opacity="0.95" />
+
+      <!-- Chrome bulb bezel -->
+      <circle cx="70" cy="32" r="13" fill="url(#lamp-ring)" stroke="#000" stroke-width="0.9" />
+      <circle cx="70" cy="32" r="11" fill="#0a0a0a" />
+
+      <!-- Bulb glass dome (this is what flickers) -->
+      <circle class="lamp-bulb" cx="70" cy="32" r="10" fill="url(#lamp-bulb-grad)" />
+
+      <!-- White-hot filament hotspot (off-centre, like a real coiled tungsten) -->
+      <ellipse class="lamp-bulb" cx="68" cy="30" rx="3" ry="1.8" fill="#fff8d8" opacity="0.95" />
+      <circle  class="lamp-bulb" cx="67" cy="29.5" r="1.1" fill="#ffffff" opacity="0.95" />
+
+      <!-- Screen-printed vintage label, slightly faded ink -->
+      <text x="120" y="36"
+            font-family="Georgia, 'Times New Roman', serif"
+            font-size="11" font-weight="700" letter-spacing="0.35em"
+            fill="#7a6840">PILOT</text>
+
+      <!-- Four corner panel screws (slot drives, slightly randomised angles) -->
+      <g>
+        <circle cx="18" cy="18" r="3.6" fill="#1a1a1a" />
+        <circle cx="18" cy="18" r="2.5" fill="url(#pilot-screw)" />
+        <line x1="15.4" y1="17" x2="20.6" y2="19" stroke="#000" stroke-width="0.7" stroke-linecap="round" />
+      </g>
+      <g>
+        <circle cx="442" cy="18" r="3.6" fill="#1a1a1a" />
+        <circle cx="442" cy="18" r="2.5" fill="url(#pilot-screw)" />
+        <line x1="440" y1="16" x2="444" y2="20" stroke="#000" stroke-width="0.7" stroke-linecap="round" />
+      </g>
+      <g>
+        <circle cx="18" cy="46" r="3.6" fill="#1a1a1a" />
+        <circle cx="18" cy="46" r="2.5" fill="url(#pilot-screw)" />
+        <line x1="16" y1="44" x2="20" y2="48" stroke="#000" stroke-width="0.7" stroke-linecap="round" />
+      </g>
+      <g>
+        <circle cx="442" cy="46" r="3.6" fill="#1a1a1a" />
+        <circle cx="442" cy="46" r="2.5" fill="url(#pilot-screw)" />
+        <line x1="439.4" y1="45" x2="444.6" y2="47" stroke="#000" stroke-width="0.7" stroke-linecap="round" />
+      </g>
+    </svg>
+  </template>
+
+  <script>
+    /**
+     * Render the logo template into every [data-capi-logo] container.
+     * Containers can opt in to drag/wheel rotation with data-interactive="true".
+     *
+     * We give each instance unique gradient IDs (otherwise the <defs> would
+     * collide across multiple SVGs in the same document).
+     */
+    // ===== Front-panel buttons: SINGLE-SELECT (radio-button behavior) =====
+    // Only one LED can be lit at a time. Clicking an already-lit button
+    // turns it off (so "no selection" is also a valid state, like a real
+    // mode-selector on studio gear).
+    const allControls = document.querySelectorAll('.capi-control');
+    allControls.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const wasPressed = btn.getAttribute('aria-pressed') === 'true';
+        // Turn every LED off first.
+        allControls.forEach(other => other.setAttribute('aria-pressed', 'false'));
+        // Then turn this one on (unless it was already on, in which case keep it off).
+        if (!wasPressed) btn.setAttribute('aria-pressed', 'true');
+
+        // Routes that navigate to a separate page.
+        const routeHrefs = { '/login': 'login.html', '/category': 'category.html' };
+        if (routeHrefs[btn.dataset.route]) {
+          window.location.href = routeHrefs[btn.dataset.route];
+          return;
+        }
+
+        // Map a lit nav button to its on-page section and smooth-scroll to it.
+        const routeTargets = { '/products': 'products' };
+        const targetId = routeTargets[btn.dataset.route];
+        if (!wasPressed && targetId) {
+          document.getElementById(targetId)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    (() => {
+      // === Constants (must be declared BEFORE attachKnobControl is invoked,
+      // otherwise the closure hits a Temporal Dead Zone ReferenceError) ===
+      const MIN_ROTATION = -179;
+      const MAX_ROTATION =  88;
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+      const tpl = document.getElementById('capi-logo-template').content;
+      let nth = 0;
+
+      document.querySelectorAll('[data-capi-logo]').forEach(container => {
+        const id = `capi-${++nth}`;
+        const node = tpl.cloneNode(true);
+        const svg = node.querySelector('svg');
+
+        // Rewire gradient IDs to be unique per instance.
+        const plateGrad = svg.querySelector('.plate-grad');
+        const knobGrad  = svg.querySelector('.knob-grad');
+        const screwGrad = svg.querySelector('.screw-grad');
+        plateGrad.id = `${id}-plate`;
+        knobGrad.id  = `${id}-knob`;
+        screwGrad.id = `${id}-screw`;
+        svg.querySelectorAll('[fill="url(#capi-plate)"]')
+          .forEach(el => el.setAttribute('fill', `url(#${id}-plate)`));
+        svg.querySelectorAll('[fill="url(#capi-knob)"]')
+          .forEach(el => el.setAttribute('fill', `url(#${id}-knob)`));
+        svg.querySelectorAll('[fill="url(#capi-screw)"]')
+          .forEach(el => el.setAttribute('fill', `url(#${id}-screw)`));
+
+        container.appendChild(node);
+
+        if (container.dataset.interactive === 'true') {
+          attachKnobControl(svg, container.dataset.readout);
+        }
+      });
+
+      /**
+       * Make this SVG behave like a volume knob:
+       *  - mouse/touch drag around the knob center -> follows the cursor angle
+       *  - mouse wheel over the SVG               -> step rotation
+       *  - rotation is clamped to [MIN_ROTATION, MAX_ROTATION] (267° total),
+       *    just like a real volume knob with mechanical stops.
+       */
+      function attachKnobControl(svg, readoutId) {
+        const spinner = svg.querySelector('.capi-spinner');
+        spinner.classList.add('interactive');
+
+        const KNOB_CX = 230, KNOB_CY = 55;   // viewBox coords of knob center
+
+        let rotation = 0;            // current applied rotation, in degrees
+        let dragging = false;
+        let pointerStartAngle = 0;   // cursor angle at pointerdown
+        let rotationStart = 0;       // rotation value at pointerdown
+
+        const readout = readoutId ? document.getElementById(readoutId) : null;
+
+        const applyRotation = (raw) => {
+          const deg = clamp(raw, MIN_ROTATION, MAX_ROTATION);
+          rotation = deg;
+          spinner.setAttribute('transform', `rotate(${deg.toFixed(2)} ${KNOB_CX} ${KNOB_CY})`);
+          if (readout) {
+            const atMin = deg <= MIN_ROTATION + 0.01;
+            const atMax = deg >= MAX_ROTATION - 0.01;
+            const tag = atMin ? ' (min)' : atMax ? ' (max)' : '';
+            readout.textContent = `Rotation: ${deg.toFixed(0)}\u00B0${tag}`;
+          }
+        };
+
+        // Compute angle (in deg) from knob center to a pointer event, in SCREEN space.
+        const angleOf = (evt) => {
+          const rect = svg.getBoundingClientRect();
+          // map knob center from viewBox -> screen
+          const cx = rect.left + (KNOB_CX / 320) * rect.width;
+          const cy = rect.top  + (KNOB_CY / 130) * rect.height;
+          return Math.atan2(evt.clientY - cy, evt.clientX - cx) * 180 / Math.PI;
+        };
+
+        svg.addEventListener('pointerdown', (e) => {
+          dragging = true;
+          spinner.classList.add('dragging');
+          pointerStartAngle = angleOf(e);
+          rotationStart = rotation;
+          svg.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        });
+
+        svg.addEventListener('pointermove', (e) => {
+          if (!dragging) return;
+          const delta = angleOf(e) - pointerStartAngle;
+          applyRotation(rotationStart + delta);
+        });
+
+        const endDrag = (e) => {
+          if (!dragging) return;
+          dragging = false;
+          spinner.classList.remove('dragging');
+          try { svg.releasePointerCapture(e.pointerId); } catch {}
+        };
+        svg.addEventListener('pointerup', endDrag);
+        svg.addEventListener('pointercancel', endDrag);
+
+        // Wheel = fine adjustment, classic volume-knob feel
+        svg.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const step = e.deltaY > 0 ? 8 : -8;
+          applyRotation(rotation + step);
+        }, { passive: false });
+
+        // Initial readout
+        applyRotation(0);
+      }
+    })();
+
+    /* ================================================================== */
+    /*  Shared helper: re-id every <defs> gradient/filter inside an SVG    */
+    /*  so multiple copies on the same page don't collide.                 */
+    /* ================================================================== */
+    function reIdDefs(svg, prefix, classNames) {
+      for (const cls of classNames) {
+        const g = svg.querySelector('.' + cls);
+        if (!g) continue;
+        const newId = `${prefix}-${cls}`;
+        g.id = newId;
+        svg.querySelectorAll(`[fill="url(#${cls})"]`).forEach(el => el.setAttribute('fill', `url(#${newId})`));
+        svg.querySelectorAll(`[stroke="url(#${cls})"]`).forEach(el => el.setAttribute('stroke', `url(#${newId})`));
+        svg.querySelectorAll(`[filter="url(#${cls})"]`).forEach(el => el.setAttribute('filter', `url(#${newId})`));
+      }
+    }
+
+    /* (VU meter render/animation moved to CapiVuMeter.vue.) */
+
+    /* ================================================================== */
+    /*  Pilot lamp panel: just clone the template + re-id its gradients   */
+    /*  so several lamps on a page can co-exist. (The flicker animation   */
+    /*  is pure CSS — see @keyframes pilotFlicker / pilotHaloPulse.)      */
+    /* ================================================================== */
+    (() => {
+      const tpl = document.getElementById('capi-pilot-template');
+      if (!tpl) return;
+      const containers = document.querySelectorAll('[data-capi-pilot]');
+      if (!containers.length) return;
+
+      let pNth = 0;
+      containers.forEach(container => {
+        const id = `pilot-${++pNth}`;
+        const node = tpl.content.cloneNode(true);
+        const svg = node.querySelector('svg');
+        reIdDefs(svg, id, [
+          'pilot-panel','pilot-rim',
+          'lamp-halo','lamp-glow','lamp-bulb-grad','lamp-ring',
+          'pilot-screw',
+        ]);
+        container.appendChild(node);
+      });
+    })();
+
+    /* ================================================================== */
+    /*  Product knobs: clone the knob-only template into every            */
+    /*  [data-capi-knob] container, with a randomised resting rotation    */
+    /*  so the rack of EQ pots looks "set" rather than perfectly aligned. */
+    /* ================================================================== */
+    (() => {
+      const tpl = document.getElementById('capi-knob-template');
+      if (!tpl) return;
+      const containers = document.querySelectorAll('[data-capi-knob]');
+      if (!containers.length) return;
+
+      // Dial scale geometry, in the knob template's user space.
+      // Centre matches the knob centre (230,55). The scale sweeps the
+      // classic ±270° EQ range with 0 at 12 o'clock, dB boost/cut both
+      // sides — same legend as the real CAPI LC25/LC40 panels.
+      const SVGNS = 'http://www.w3.org/2000/svg';
+      const CX = 230, CY = 55;
+      const R_TICK_IN = 70, R_TICK_OUT_MAJ = 78, R_TICK_OUT_MIN = 74;
+      const R_NUM = 86, R_RING = 71;
+      const LABELS = [15, 12, 9, 6, 4, 2, 0, 2, 4, 6, 9, 12, 15];
+      const START = -135, STEP = 22.5;            // degrees, 0 = top
+
+      const polar = (deg, r) => {
+        const rad = (deg * Math.PI) / 180;
+        return [CX + r * Math.sin(rad), CY - r * Math.cos(rad)];
+      };
+
+      const buildScale = () => {
+        const g = document.createElementNS(SVGNS, 'g');
+
+        // Hollow ring around the knob
+        const ring = document.createElementNS(SVGNS, 'circle');
+        ring.setAttribute('cx', CX);
+        ring.setAttribute('cy', CY);
+        ring.setAttribute('r', R_RING);
+        ring.setAttribute('fill', 'none');
+        ring.setAttribute('stroke', '#d8d8d8');
+        ring.setAttribute('stroke-width', '1.4');
+        ring.setAttribute('opacity', '0.85');
+        g.appendChild(ring);
+
+        LABELS.forEach((val, i) => {
+          const deg = START + i * STEP;
+          const major = (val === 0 || val === 6 || val === 12 || val === 15);
+          const [x1, y1] = polar(deg, R_TICK_IN);
+          const [x2, y2] = polar(deg, major ? R_TICK_OUT_MAJ : R_TICK_OUT_MIN);
+
+          const tick = document.createElementNS(SVGNS, 'line');
+          tick.setAttribute('x1', x1.toFixed(1));
+          tick.setAttribute('y1', y1.toFixed(1));
+          tick.setAttribute('x2', x2.toFixed(1));
+          tick.setAttribute('y2', y2.toFixed(1));
+          tick.setAttribute('stroke', major ? '#f0f0f0' : '#9aa0a6');
+          tick.setAttribute('stroke-width', major ? '1.8' : '1.1');
+          tick.setAttribute('stroke-linecap', 'round');
+          g.appendChild(tick);
+
+          // Number at each tick. 0 in cyan (centre detent), rest light.
+          const [nx, ny] = polar(deg, R_NUM);
+          const t = document.createElementNS(SVGNS, 'text');
+          t.setAttribute('x', nx.toFixed(1));
+          t.setAttribute('y', (ny + 4).toFixed(1));
+          t.setAttribute('text-anchor', 'middle');
+          t.setAttribute('font-family', '-apple-system, sans-serif');
+          t.setAttribute('font-size', major ? '12' : '10');
+          t.setAttribute('font-weight', '700');
+          t.setAttribute('fill', val === 0 ? '#3FB5F0' : '#e6e6e6');
+          t.textContent = String(val);
+          g.appendChild(t);
+        });
+
+        // "−" / "+" boost-cut signs flanking 0 at the top.
+        [['−', -1], ['+', 1]].forEach(([sym, side]) => {
+          const [sx, sy] = polar(side * 12, R_NUM + 9);
+          const s = document.createElementNS(SVGNS, 'text');
+          s.setAttribute('x', sx.toFixed(1));
+          s.setAttribute('y', (sy + 4).toFixed(1));
+          s.setAttribute('text-anchor', 'middle');
+          s.setAttribute('font-family', '-apple-system, sans-serif');
+          s.setAttribute('font-size', '13');
+          s.setAttribute('font-weight', '800');
+          s.setAttribute('fill', '#3FB5F0');
+          s.textContent = sym;
+          g.appendChild(s);
+        });
+
+        return g;
+      };
+
+      // Each knob is cloned with its own unique gradient IDs. The spin
+      // itself is pure CSS (see .kn-spinner animation), so we only need
+      // a small random starting offset so the rack doesn't begin in
+      // lockstep, then CSS takes over the continuous 360° rotation.
+      let kNth = 0;
+      containers.forEach(container => {
+        const id = `kn-${++kNth}`;
+        const node = tpl.content.cloneNode(true);
+        const svg = node.querySelector('svg');
+        reIdDefs(svg, id, ['kn-plate', 'kn-knob', 'kn-screw']);
+
+        // Inject the static dial scale (ring + ticks + numbers).
+        const scaleSlot = svg.querySelector('.kn-scale');
+        if (scaleSlot) scaleSlot.appendChild(buildScale());
+
+        const spinner = svg.querySelector('.kn-spinner');
+        // Random negative delay → each knob starts mid-rotation.
+        spinner.style.animationDelay = `-${(Math.random() * 14).toFixed(2)}s`;
+
+        container.appendChild(node);
+      });
+    })();
+
+    /* ================================================================== */
+    /*  BYP / ACT rocker: clicking the switch flips the module between     */
+    /*  Active (green LED) and Bypass (red LED). Only one LED lit at a     */
+    /*  time, driven by the data-state on .module-toggles.                 */
+    /* ================================================================== */
+    (() => {
+      document.querySelectorAll('.module-toggle').forEach(btn => {
+        const module = btn.closest('.capi-module');
+        if (!module) return;
+        btn.addEventListener('click', () => {
+          const next = module.getAttribute('data-state') === 'byp' ? 'act' : 'byp';
+          module.setAttribute('data-state', next);
+        });
+      });
+    })();
+
+    /* ================================================================== */
+    /*  Theme toggle: the panel-mounted switch flips the whole site        */
+    /*  between dark and light (and turns the pilot lamp off in light).    */
+    /* ================================================================== */
+    (() => {
+      const sw = document.getElementById('theme-switch');
+      if (!sw) return;
+      sw.addEventListener('click', () => {
+        const root = document.documentElement;
+        const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        root.setAttribute('data-theme', next);
+        sw.setAttribute('aria-pressed', String(next === 'light'));
+      });
+    })();
+
+    /* ================================================================== */
+    /*  Model switch: clicking LC25 / LC40 shows only that product unit.   */
+    /* ================================================================== */
+    (() => {
+      const tabs = document.querySelectorAll('.product-tab');
+      const products = document.querySelectorAll('.product[data-product]');
+      if (!tabs.length || !products.length) return;
+
+      const show = target => {
+        tabs.forEach(t =>
+          t.setAttribute('aria-selected', String(t.dataset.target === target)));
+        products.forEach(p => {
+          if (p.dataset.product === target) p.removeAttribute('hidden');
+          else p.setAttribute('hidden', '');
+        });
+      };
+
+      tabs.forEach(tab =>
+        tab.addEventListener('click', () => show(tab.dataset.target)));
+    })();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CAPI">
+  <!-- White rounded background so the mark reads on any browser tab -->
+  <rect width="64" height="64" rx="13" fill="#ffffff"/>
+  <!-- The CAPI octagon knob, scaled down from the full logo geometry -->
+  <g transform="translate(32 33) scale(0.44) translate(-231 -55)">
+    <path
+      d="M 208,5 L 282,3 L 283,4
+         L 280,77 Q 259,84 252,105
+         L 208,105 Q 201,84 180,77
+         L 180,33 Q 201,26 208,5 Z"
+      fill="#BFBFBF" stroke="#1a1a1a" stroke-width="2.4"/>
+    <circle cx="230" cy="55" r="40" fill="#0a3640"/>
+    <circle cx="230" cy="55" r="38" fill="#007DC5"/>
+    <ellipse cx="218" cy="42" rx="14" ry="9" fill="#ffffff" fill-opacity="0.22"/>
+    <circle cx="230" cy="24" r="3.2" fill="#ffffff"/>
+    <circle cx="275" cy="13" r="3.6" fill="#2a2a2a" stroke="#0a0a0a" stroke-width="0.8"/>
+  </g>
+</svg>
