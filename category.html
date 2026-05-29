@@ -345,6 +345,58 @@
     }
     .patch-lbl { overflow: hidden; text-overflow: ellipsis; }
 
+    /* === 1/4" TRS patch plug: drops into the jack on click, then redirects ===
+       Assembly = chrome knurled barrel (.plug) + colored cable above
+       (.plug-cable) + a TRS shaft with two black insulator rings (.plug-tip). */
+    .jack .plug {
+      position: absolute; left: 50%; bottom: 50%;
+      width: 11px; height: 13px; border-radius: 2px;
+      /* knurled chrome cylinder */
+      background:
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 2.5px),
+        linear-gradient(90deg, #4d4d4d 0%, #fcfcfc 44%, #d4d4d4 56%, #474747 100%);
+      box-shadow:
+        inset 0 2px 0 rgba(255,255,255,0.55),
+        inset 0 -2px 2px rgba(0,0,0,0.45),
+        0 2px 4px rgba(0,0,0,0.55);
+      transform: translate(-50%, -230%); opacity: 0;
+      transition: transform .36s cubic-bezier(.5,.02,.3,1.2), opacity .12s ease;
+      pointer-events: none;
+    }
+    /* Colored, lightly-braided cable trailing up off the barrel + strain boot */
+    .jack .plug-cable {
+      position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+      width: 5px; height: 28px; border-radius: 3px;
+      background:
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.18) 0 1px, transparent 1px 3px),
+        linear-gradient(90deg, #06547f 0%, #2aa3e0 44%, #0a90db 56%, #064f78 100%);
+    }
+    .jack .plug-cable::after {           /* rubber strain-relief boot at the barrel */
+      content: ''; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+      width: 8px; height: 5px; border-radius: 0 0 3px 3px;
+      background: linear-gradient(90deg, #1a1a1a 0%, #555 50%, #1a1a1a 100%);
+    }
+    /* TRS shaft: nickel with two black insulator rings + rounded bullet tip */
+    .jack .plug-tip {
+      position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+      width: 5px; height: 12px; border-radius: 0 0 2.5px 2.5px;
+      background:
+        linear-gradient(90deg, rgba(0,0,0,0.4) 0%, rgba(255,255,255,0.6) 44%, rgba(255,255,255,0.15) 56%, rgba(0,0,0,0.4) 100%),
+        linear-gradient(180deg,
+          #d4d4d4 0%, #f4f4f4 12%,
+          #131313 24%, #131313 31%,
+          #ededed 34%, #f4f4f4 50%,
+          #131313 53%, #131313 60%,
+          #ededed 64%, #cfcfcf 100%);
+      background-blend-mode: overlay, normal;
+    }
+    /* Plugged in: cable seated, tip buried in the socket, jack lights cyan. */
+    .jack.is-patched .plug { transform: translate(-50%, -64%); opacity: 1; }
+    .jack.is-patched {
+      box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 14px rgba(0,190,255,0.85);
+    }
+    .patch.is-patched { color: #fff; }
+
     .bay-foot {
       max-width: 1200px; margin: 34px auto 0; padding-top: 18px;
       border-top: 1px solid #1c1c1c; position: relative; z-index: 1;
@@ -560,8 +612,8 @@
           </button>
           <div class="cat-drawer">
             <div class="patchbay">
-              ${subs.map(s => `<a class="patch" href="${url}" target="_blank" rel="noopener">
-                  <span class="jack" aria-hidden="true"></span>
+              ${subs.map(s => `<a class="patch" href="${url}" rel="noopener">
+                  <span class="jack" aria-hidden="true"><span class="plug"><span class="plug-cable"></span><span class="plug-tip"></span></span></span>
                   <span class="patch-lbl">${esc(s)}</span>
                 </a>`).join('')}
             </div>
@@ -573,8 +625,21 @@
       document.getElementById('bay-count').textContent = CATEGORIES.length;
       document.getElementById('bay-parts').textContent = parts;
 
-      /* One delegated listener pulls/closes a module's patch drawer. */
+      /* One delegated listener: patch points plug a cable in then redirect,
+         and module headers pull/close their drawer. */
       rack.addEventListener('click', (e) => {
+        const patch = e.target.closest('.patch');
+        if (patch) {
+          e.preventDefault();
+          const jack = patch.querySelector('.jack');
+          if (patch.classList.contains('is-patched')) return;   // already firing
+          patch.classList.add('is-patched');
+          jack.classList.add('is-patched');
+          const href = patch.getAttribute('href');
+          // Let the plug seat into the socket, then route to the sub-category.
+          setTimeout(() => { window.location.href = href; }, 460);
+          return;
+        }
         const head = e.target.closest('.cat-head');
         if (!head) return;
         const open = head.parentElement.classList.toggle('is-open');
