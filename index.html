@@ -1305,7 +1305,7 @@
         if (!wasPressed) btn.setAttribute('aria-pressed', 'true');
 
         // Routes that navigate to a separate page.
-        const routeHrefs = { '/login': 'login.html', '/category': 'category.html' };
+        const routeHrefs = { '/login': 'login.html', '/category': 'category.html', '/support': 'support.html' };
         if (routeHrefs[btn.dataset.route]) {
           window.location.href = routeHrefs[btn.dataset.route];
           return;
